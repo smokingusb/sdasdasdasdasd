@@ -1,0 +1,32 @@
+name: Publish Windows build
+
+on:
+  workflow_dispatch:    # позволяет запускать вручную из GitHub UI
+  push:
+    branches: [ "main" ]  # запускать при push в main (опционально)
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '7.0'   # или '8.0' — подстройте под ваш TargetFramework
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Publish self-contained single-file exe
+        run: |
+          dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true -o publish
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wgconfighelper-windows
+          path: publish
