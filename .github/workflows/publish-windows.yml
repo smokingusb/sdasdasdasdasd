@@ -1,9 +1,9 @@
 name: Publish Windows build
 
 on:
-  workflow_dispatch:    # позволяет запускать вручную из GitHub UI
+  workflow_dispatch:
   push:
-    branches: [ "main" ]  # запускать при push в main (опционально)
+    branches: [ "main" ]
 
 jobs:
   build:
@@ -16,14 +16,32 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '7.0'   # или '8.0' — подстройте под ваш TargetFramework
+          dotnet-version: '7.0'
 
-      - name: Restore
-        run: dotnet restore
-
-      - name: Publish self-contained single-file exe
+      - name: Find project or solution and publish
+        shell: pwsh
         run: |
-          dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true -o publish
+          Write-Host "Repository root: $env:GITHUB_WORKSPACE"
+          $sln = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Filter *.sln -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($sln) {
+            $proj = $sln.FullName
+            Write-Host "Using solution: $proj"
+          } else {
+            $csproj = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Filter *.csproj -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($csproj) {
+              $proj = $csproj.FullName
+              Write-Host "Using project: $proj"
+            } else {
+              Write-Error "No .sln or .csproj found in repository. Ensure project files are committed."
+              exit 1
+            }
+          }
+
+          Write-Host "Running: dotnet restore `"$proj`""
+          dotnet restore "$proj"
+
+          Write-Host "Running: dotnet publish `"$proj`" -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true -o `"$env:GITHUB_WORKSPACE/publish`""
+          dotnet publish "$proj" -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true -o "$env:GITHUB_WORKSPACE/publish"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
